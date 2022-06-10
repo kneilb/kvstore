@@ -18,12 +18,12 @@ fn main() -> Result<(), AppErrors> {
     // println!("{:?}", database);
 
     if op == "set" {
-        database.set_key(key.to_owned(), val.to_owned());
-        println!("Set key {} to value {}", key, val);
+        println!("SET: key '{}', value '{}'", &key, &val);
+        database.set_key(key, val);
     } else if op == "get" {
-        match database.get_key(key.to_owned()) {
+        match database.get_key(&key) {
             Some(val) => {
-                println!("Got key {}, has value {}", key, val);
+                println!("GET: key '{}', value '{}'", key, val);
             },
             None => {
                 return Err(AppErrors::KeyNotFoundError(key))
@@ -55,7 +55,7 @@ impl Database {
                     map.insert(key.to_owned(), val.to_owned());
                 }
                 Database {
-                    map: map
+                    map
                 }
             }
             Err(_e) => {
@@ -68,8 +68,12 @@ impl Database {
 
     fn save(&self) -> Result<(), AppErrors> {
         let mut contents: String = String::new();
-        for (key, val) in self.map.iter() {
-            contents.push_str(&format!("{}\t{}\n", key, val));
+        for (key, val) in &self.map {
+            // contents.push_str(&format!("{}\t{}\n", key, val));
+            contents.push_str(key);
+            contents.push('\t');
+            contents.push_str(val);
+            contents.push('\n');
         }
         
         if let Err(e) = std::fs::write("kv.db", contents) {
@@ -83,7 +87,7 @@ impl Database {
         self.map.insert(key, val);
     }
 
-    fn get_key(&self, key: String) -> Option<&String> {
-        self.map.get(&key)
+    fn get_key(&self, key: &str) -> Option<&String> {
+        self.map.get(key)
     }
 }
