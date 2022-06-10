@@ -69,7 +69,6 @@ impl Database {
     fn save(&self) -> Result<(), AppErrors> {
         let mut contents: String = String::new();
         for (key, val) in &self.map {
-            // contents.push_str(&format!("{}\t{}\n", key, val));
             contents.push_str(key);
             contents.push('\t');
             contents.push_str(val);
