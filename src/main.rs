@@ -2,23 +2,38 @@ use std::collections::HashMap;
 
 #[derive(Debug)]
 enum AppErrors {
-    SaveError(std::io::Error),
+    DatabaseSaveError(std::io::Error),
+    KeyNotFoundError(String),
+    UnrecognisedOperationError(String)
 }
 
 fn main() -> Result<(), AppErrors> {
     let mut args = std::env::args().skip(1);
-    let key = args.next().unwrap();
-    let val = args.next().unwrap();
-
-    println!("{} <- {}", key, val);
+    let op = args.next().expect("No operation");
+    let key = args.next().expect("No key");
+    let val = if op == "set" { args.next().expect("No value") } else { String::new() };
 
     let mut database: Database = Database::new();
 
-    println!("{:?}", database);
+    // println!("{:?}", database);
 
-    database.add_key(key, val);
+    if op == "set" {
+        database.set_key(key.to_owned(), val.to_owned());
+        println!("Set key {} to value {}", key, val);
+    } else if op == "get" {
+        match database.get_key(key.to_owned()) {
+            Some(val) => {
+                println!("Got key {}, has value {}", key, val);
+            },
+            None => {
+                return Err(AppErrors::KeyNotFoundError(key))
+            }
+        }
+    } else {
+        return Err(AppErrors::UnrecognisedOperationError(op));
+    }
 
-    println!("{:?}", database);
+    // println!("{:?}", database);
 
     database.save()?;
 
@@ -57,11 +72,18 @@ impl Database {
             contents.push_str(&format!("{}\t{}\n", key, val));
         }
         
-        std::fs::write("kv.db", contents).expect("Failed to write database");
-        Ok(())
+        if let Err(e) = std::fs::write("kv.db", contents) {
+            Err(AppErrors::DatabaseSaveError(e))
+        } else {
+            Ok(())
+        }
     }
 
-    fn add_key(&mut self, key: String, val: String) {
+    fn set_key(&mut self, key: String, val: String) {
         self.map.insert(key, val);
+    }
+
+    fn get_key(&self, key: String) -> Option<&String> {
+        self.map.get(&key)
     }
 }
