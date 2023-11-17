@@ -1,36 +1,49 @@
+use clap::Parser;
 use std::collections::HashMap;
 
 #[derive(Debug)]
 enum AppErrors {
     DatabaseSaveError(std::io::Error),
     KeyNotFoundError(String),
-    UnrecognisedOperationError(String)
+}
+
+#[derive(clap::Subcommand)]
+enum Operations {
+    Get,
+    Set {
+        #[arg(short, long)]
+        value: String,
+    },
+}
+
+#[derive(Parser)]
+#[clap(name = "kvstore", version = "0.1.0", author = "Neil Burningham")]
+struct Args {
+    #[command(subcommand)]
+    operation: Operations,
+
+    #[arg(short, long)]
+    key: String,
 }
 
 fn main() -> Result<(), AppErrors> {
-    let mut args = std::env::args().skip(1);
-    let op = args.next().expect("No operation");
-    let key = args.next().expect("No key");
-    let val = if op == "set" { args.next().expect("No value") } else { String::new() };
+    let args = Args::parse();
 
     let mut database: Database = Database::new();
 
     // println!("{:?}", database);
 
-    if op == "set" {
-        println!("SET: key '{}', value '{}'", &key, &val);
-        database.set_key(key, val);
-    } else if op == "get" {
-        match database.get_key(&key) {
-            Some(val) => {
-                println!("GET: key '{}', value '{}'", key, val);
-            },
-            None => {
-                return Err(AppErrors::KeyNotFoundError(key))
-            }
+    match args.operation {
+        Operations::Set { value } => {
+            println!("SET: key '{}' <- value '{}'", &args.key, &value);
+            database.set_key(args.key, value);
         }
-    } else {
-        return Err(AppErrors::UnrecognisedOperationError(op));
+        Operations::Get => match database.get_key(&args.key) {
+            Some(val) => {
+                println!("GET: key '{}' -> value '{}'", args.key, val);
+            }
+            None => return Err(AppErrors::KeyNotFoundError(args.key)),
+        },
     }
 
     // println!("{:?}", database);
@@ -54,15 +67,11 @@ impl Database {
                     let (key, val) = line.split_once('\t').expect("error!");
                     map.insert(key.to_owned(), val.to_owned());
                 }
-                Database {
-                    map
-                }
+                Database { map }
             }
-            Err(_e) => {
-                Database {
-                    map: HashMap::new()
-                }
-            }
+            Err(_e) => Database {
+                map: HashMap::new(),
+            },
         }
     }
 
@@ -74,7 +83,7 @@ impl Database {
             contents.push_str(val);
             contents.push('\n');
         }
-        
+
         if let Err(e) = std::fs::write("kv.db", contents) {
             Err(AppErrors::DatabaseSaveError(e))
         } else {
